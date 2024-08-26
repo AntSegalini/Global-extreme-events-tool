@@ -7,7 +7,7 @@ from functools import partial
 
 #############################################################################
 
-def min_dur_tex(latitude,longitude,tex_gridpoints,duration): # Checked 20231209
+def min_dur_tex(latitude,longitude,tex_gridpoints,duration): 
     # function to eliminate heatwaves/cold spells shorter than duration days
     Ntime = np.max(tex_gridpoints[0])+1
     Nlat  = len(latitude)
@@ -37,7 +37,7 @@ def min_dur_tex(latitude,longitude,tex_gridpoints,duration): # Checked 20231209
 
 #############################################################################
 
-def interpolate_points(P,latitude,longitude): # Checked 20231209
+def interpolate_points(P,latitude,longitude): 
     if len(P)>0:
         # interpolation to get latitude/longitude
         lax, lox=np.floor(P[:,0]).astype(int), np.floor(P[:,1]).astype(int)
@@ -49,7 +49,7 @@ def interpolate_points(P,latitude,longitude): # Checked 20231209
 #############################################################################
 
 def cluster_analysis_centroid_edges(latitude , longitude , extent_flag , cluster_type , cluster_distance , \
-                                    extent , Area , gridpoint): # Checked 20231209
+                                    extent , Area , gridpoint): 
     """
     Function that perform the cluster analysis of the heatwave gridboxes for a single time step (parallelised)
     """
@@ -142,7 +142,7 @@ def cluster_analysis_centroid_edges(latitude , longitude , extent_flag , cluster
 #############################################################################
 
 def cluster_tex(time, latitude, longitude, tex_gridpoints, extent_flag=True, cluster_distance=250, \
-                dist_type='centroid', extent=10000): # Checked 20231209
+                dist_type='centroid', extent=10000): 
     """
     Function which implements clustering of heatwave gridboxes (it just organises the parallelisation)
 
@@ -196,7 +196,7 @@ def cluster_tex(time, latitude, longitude, tex_gridpoints, extent_flag=True, clu
 
 def t2m_extreme(month_list, yr_list, latind, percentile=5, data_type='anomaly', data_det=False, \
                 mask=True, duration=4, extent_flag=True, cluster_ex=1000, \
-                dist_type='centroid', extent=2e5): # Checked 20231209
+                dist_type='centroid', extent=2e5): 
     """
     Main function which defines areas and characteristics of extreme 
     temperatures. Takes as input montly files of daily 2m temperature and
@@ -268,81 +268,3 @@ def t2m_extreme(month_list, yr_list, latind, percentile=5, data_type='anomaly', 
         average_variable_all.append(average_variable)
 
     return time, time_cluster, Areas, average_variable_all, LATLON
-
-#############################################################################
-
-# if __name__=='__main__':
-#     import matplotlib.pyplot as plt
-#     import time
-
-#     #############################################################################
-
-#     # # test for the duration sorting
-#     # A=[0,0,0,1,1,1,1,1,0,0,0,1,1,0,1,0,0,0,1,1,1]
-#     # duration=4
-#     # Nx,Ny=1,2
-#     # lst=np.array(A)
-#     # lst=np.repeat(lst[...,np.newaxis],Nx,axis=-1)
-#     # lst=np.repeat(lst[...,np.newaxis],Ny,axis=-1)
-#     # Q=np.ones((Nx,Ny))*0.1
-#     # tex_gridpoints=np.where(lst>Q)
-#     # print(tex_gridpoints)
-#     # p=min_dur_tex(tex_gridpoints,duration)
-#     # print(p)
-    
-#     #############################################################################
-
-#     # var_data,time,latitude,longitude=ssn_data_load([9], [2020], np.arange(361), 'anomaly', False, False)
-
-#     # X=var_data[6]
-#     # plt.subplot(131)
-#     # plt.contourf(longitude,latitude,X,30);plt.colorbar()
-#     # plt.contour(longitude,latitude,X,levels=[-4],colors='r')
-#     # Y=np.zeros_like(X)
-#     # Y[X<-4]=1
-#     # plt.subplot(132)
-#     # plt.contourf(longitude,latitude,Y,30);plt.colorbar()
-#     # plt.subplot(133)
-#     # plt.contour(longitude,latitude,X,levels=[-4],colors='r')
-#     # Y=np.repeat(Y[np.newaxis],1,axis=0)
-#     # tex_gridpoints=np.where(Y==1)
-
-#     # gridpoint=[]
-#     # # conversion of indices for the parallelisation
-#     # s=np.where(tex_gridpoints[0]==0)[0]
-#     # gridpoint.append([0,tex_gridpoints[1][s],tex_gridpoints[2][s]])
-
-#     # Area=Area_rectangle_unit(latitude,longitude)
-#     # HH=cluster_analysis_centroid_edges(latitude , longitude , True , 'centroid' , 2000 , 10000 , Area , gridpoint[0])
-
-#     # istante=HH[0]
-#     # Areas=HH[1]
-#     # LATLON=HH[2]
-    
-#     # for i in range(len(LATLON)):
-#     #     LATLON[i]=np.array([LATLON[i][0],LATLON[i][1]]).T # conversion in latitude/longitude
-#     #     interpolate_points(LATLON[i],latitude,longitude)
-#     #     LL=LATLON[i]
-#     #     plt.plot(LL[:,1],LL[:,0],'o')
-#     #     plt.pause(0.1)
-#     #     plt.title(i)
-
-#     # plt.show()
-    
-#     #############################################################################   
-            
-#     tt=time.time()
-#     X=t2m_extreme([1,2,12], np.arange(1980,1990), np.arange(361),  10, 'anomaly', True, True, 3, True, 400,'centroid',10000)
-#     print(time.time()-tt)
-
-#     # pos=15
-#     # print(X[0][pos],'\n')
-#     # print(X[1][pos],'\n')
-#     # print(X[2][pos],'\n')
-#     # for i in range(len(X[3][pos])):
-#     #     LL=X[3][pos][i]
-#     #     plt.plot(LL[:,1],LL[:,0],'o')
-#     #     plt.pause(1)
-#     # plt.show()
-    
-#     #############################################################################

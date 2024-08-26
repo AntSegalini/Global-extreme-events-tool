@@ -1,6 +1,6 @@
 import numpy as np
 import pickle , os
-from file_details import *
+from file_details import filePath_absolute, filePath_trend_climatology, start_calendar_day,filePath_mask_ERA5, filePath_mask
 
 #############################################################################
 
@@ -15,7 +15,7 @@ def haversine(P1, P2):
 
 #############################################################################
 
-def areaquad(P1,P2): # Checked 20240404
+def areaquad(P1,P2): 
     # spherical area between two points (P1 and P2 are corner points)
     Az  = np.sin(np.deg2rad(P2[0])) - np.sin(np.deg2rad(P1[0]))
     Az *= np.deg2rad(P2[1]-P1[1])
@@ -24,37 +24,35 @@ def areaquad(P1,P2): # Checked 20240404
 
 #############################################################################
 
-def Area_rectangle_unit(latitude,longitude): # Checked 20240404
+def Area_rectangle_unit(latitude,longitude):
+    # meridional vector of the area of each grid box
     Area=np.array([areaquad([latitude[i],longitude[0]],[latitude[i+1],longitude[1]]) for i in range(len(latitude)-1)])
     return np.concatenate( (np.zeros(1) , (Area[1:]+Area[:-1])/2 , np.zeros(1)) )
 
 #############################################################################
 
-def moving_average_periodic_FFT(x, w, axis=0):
-    """
-    Routine designed to smooth periodic data with an odd moving window with size w
-    """
-    x_hat=np.fft.fft(np.moveaxis(x,axis,0),axis=0)
-    
+def moving_average_periodic_FFT(x, w, axis=0):    
+    # Routine designed to smooth periodic data with an odd moving window with size w
+    x_hat=np.fft.fft(np.moveaxis(x,axis,0),axis=0)    
     filter_hat=np.fft.fft(np.ones(w)/w,n=x.shape[axis])   
-
     x_hat[:]=(x_hat.T * filter_hat).T
-
-    x_hat=np.fft.ifft(x_hat,axis=0).real
-    
+    x_hat=np.fft.ifft(x_hat,axis=0).real    
     return np.moveaxis(np.roll(x_hat,-(w-1)//2,axis=0),0,axis)
 
 #############################################################################
 
-def save_detrended_and_anomalies(startyr, endyr): # Checked 20240404
+def save_detrended_and_anomalies(startyr, endyr):
     """
     This routine assumes that the data have been already saved in daily format
     The trends are computed from start to end of the analysed period
     The climatology is computed from start to end and it includes the 29th of February
     The outputs are stored in a climatology file that is retrieved when needed
+
+    The inputs are the start and end year of the analysed period
     """
 
-    d0 = 29219    # number of days at 1/1/1980
+    d0 = start_calendar_day()
+    
     days = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] 
     sum_days = np.concatenate((np.zeros(1,dtype=np.int32),np.cumsum(days)),axis=0)  
         
@@ -80,14 +78,14 @@ def save_detrended_and_anomalies(startyr, endyr): # Checked 20240404
                     longitude=F['longitude']
 
                 # detrending algorithm (this is to avoid to load the entire dataset but rather ony a month at time)               
-                s=F['time']//24-d0  # number of days from the 1/1/1980
+                s=(F['time']-d0)//(3600*24)  # number of days from the 1/1/1980
                 A+=np.sum((F['data'].T*s).T,axis=0)
                 B+=np.sum(F['data'],axis=0)
                 X=np.concatenate((X,s))
 
                 #estimating climatology
                 climatology[month-1][:Nd]+=F['data']
-                climatology_time[month-1][:Nd]+=F['time']//24
+                climatology_time[month-1][:Nd]+=F['time']//(3600*24)
                 NN[month-1]+=1
                 if Nd==29:     
                     NNleap+=1
@@ -99,7 +97,7 @@ def save_detrended_and_anomalies(startyr, endyr): # Checked 20240404
     m=(N*A-X1*B)/den    # slope of trend (K/days)
     q=(X2*B-X1*A)/den   # intercept of trend (K)
 
-    q-=m*d0             # back after the normalisation
+    q-=m*(d0//(3600*24))  # back after the normalisation
     Ymean=B/N           # mean of data
     q-=Ymean            # intercept of detrended data (once we subtract the trend, the mean remains)
 
@@ -129,7 +127,7 @@ def save_detrended_and_anomalies(startyr, endyr): # Checked 20240404
 
 #############################################################################
 
-def save_mask(): # Checked 20240404
+def save_mask(): 
     from netCDF4 import Dataset
     fileName , original_resolution , desired_resolution , root_path = filePath_mask_ERA5()
     delta=int(desired_resolution/original_resolution) # original resolution 0.1 degrees
@@ -143,29 +141,25 @@ def save_mask(): # Checked 20240404
     
 #############################################################################
 
-def ssn_data_load( month_list, yr_list, latind,  data_type='absolute', data_det=False, mask=True): # Checked 20231209
+def ssn_data_load( month_list, yr_list, latind,  data_type='absolute', data_det=False, mask=True): 
     """
     Main function which defines areas and characteristics of extreme 
     temperatures. Takes as input monthly files of daily 2m temperature and
-    temperature anomalies on a regular lat-lon grid.
-
-    To think about, need to include in output info on lat and lon of each
-    region to be able to couple e.g. duration to specific regions, as well as
-    temp anomalies/abs values
+    temperature anomalies on a regular lat-lon grid. It applies to any other physical variable
 
     Input
-    month_list: season. Can be provided as a row vector of month using values 1 to 12.
-    yr_list: list of years in data.
-    latind: latitude indices of selected domain.
-    data_type: 'absolute' (absolute values) or 'anomaly' (anomalies).
-    data_det: True or False. If True, applies a linear detrend to the raw temperature data.
-    mask: True or False. If True, applies a mask where the points over sea are replaced by np.nan
+    - month_list: season. Can be provided as a row vector of month using values 1 to 12.
+    - yr_list: list of years in data.
+    - latind: latitude indices of selected domain.
+    - data_type: 'absolute' (absolute values) or 'anomaly' (anomalies).
+    - data_det: True or False. If True, applies a linear detrend to the raw temperature data.
+    - mask: True or False. If True, applies a mask where the points over sea are replaced by np.nan
 
     Output
-    var_data: required temperature data, in a single timexlonxlat matrix
-    time: time indices (hours from 1/1/1900)
-    latitude: Latitude values restricted to latind [deg]
-    longitude: Longitude values [deg]
+    - var_data: required temperature data, in a single timexlonxlat matrix
+    - time: time indices (hours from 1/1/1900)
+    - latitude: Latitude values restricted to latind [deg]
+    - longitude: Longitude values [deg]
     
     """
     
@@ -186,7 +180,7 @@ def ssn_data_load( month_list, yr_list, latind,  data_type='absolute', data_det=
             F=pickle.load(f)
 
         Nd=F['data'].shape[0]   # number of days in the month
-        s=F['time']//24         # number of days from 1/1/1900
+        s=F['time']//(3600*24)  # number of days from 1/1/1970
         OUTPUT=F['data']        # regular data
         
         if data_type=='anomaly':
@@ -202,7 +196,7 @@ def ssn_data_load( month_list, yr_list, latind,  data_type='absolute', data_det=
         if mask:
             OUTPUT*=MASK
 
-        return OUTPUT[:,latind],F['time'],F['latitude'][latind],F['longitude']
+        return OUTPUT[:,latind],F['time']//(3600*24),F['latitude'][latind],F['longitude']
     
     #############################################################
 
@@ -214,5 +208,5 @@ def ssn_data_load( month_list, yr_list, latind,  data_type='absolute', data_det=
                 U,tempo,lat,lon=get_data(month,year)
                 var_data.append(U)
                 time_data.append(tempo)
-    
+                
     return np.concatenate(var_data,axis=0),np.concatenate(time_data),lat,lon
