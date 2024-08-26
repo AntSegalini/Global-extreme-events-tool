@@ -1,22 +1,22 @@
-import cdsapi
+import cdsapi, os, pickle
 from netCDF4 import Dataset
 import numpy as np
-import pickle
-from file_details import *
-import os
-c = cdsapi.Client()
+from file_details import filePath_absolute
+
+client = cdsapi.Client()
+
+#########################################################
 
 for year in range(2023,2024):
     for month in range(1,13):
-        fileName = 't2m_ERA5_1hr_05x05_'+str(year)+str(month).zfill(2)+'.nc'
-        c.retrieve(    'reanalysis-era5-single-levels',
-        {
-        'product_type': 'reanalysis',
-        'format': 'netcdf',
-        'variable': '2m_temperature',
-        'year': str(year),
-        'month': str(month).zfill(2),
-        'day': [
+        fileName = 't2m_ERA5_1hr_05x05_'+str(year)+str(month).zfill(2)+'.nc' # Filename of the saved hourly data (will be removed automatically)
+        dataset = "reanalysis-era5-single-levels"
+        request = {
+            'product_type': ['reanalysis'],
+            'variable': ['2m_temperature'],
+            'year': [str(year)],
+            'month': [str(month).zfill(2)],
+            'day': [
             '01', '02', '03',
             '04', '05', '06',
             '07', '08', '09',
@@ -29,7 +29,7 @@ for year in range(2023,2024):
             '28', '29', '30',
             '31',
         ],
-        'time': [
+            'time': [
             '00:00', '01:00', '02:00',
             '03:00', '04:00', '05:00',
             '06:00', '07:00', '08:00',
@@ -39,22 +39,31 @@ for year in range(2023,2024):
             '18:00', '19:00', '20:00',
             '21:00', '22:00', '23:00',
         ],
-        },  fileName )
+            'data_format': 'netcdf',
+            'download_format': 'unarchived'
+        }
+
+        client.retrieve(dataset, request).download(fileName)
 
         # additional part that decimates the data, makes daily averages and saves them in a .pkl file
         fh = Dataset(fileName, mode='r')
-        decimation_lat,decimation_lon=2,2   # 0.5,0.5 degrees
+
+        decimation_lat,decimation_lon=2,2   # 0.5 , 0.5 degrees (with 1,1 the resolution is 0.25 deg x 0.25 deg)
+        
         latval = fh.variables['latitude'][::decimation_lat]
         lonval = fh.variables['longitude'][::decimation_lon]
-        time_orig = fh.variables['time'][:]
+        time_orig = fh.variables['valid_time'][:]
         Ndays=len(time_orig)//24
         t_list,var_data=[],[]
+
         for i in range(Ndays):
             t_list.append(time_orig[i*24])
             var_data.append( np.mean(fh.variables['t2m'][i*24:(i+1)*24,::decimation_lat,::decimation_lon],axis=0) ) # Daily variable (lat,lon)
-
         fh.close()
-        var_data=np.stack(var_data,axis=0) # (time,lat,lon)
+
+        var_data=np.stack(var_data,axis=0)  # (time,lat,lon)
+
+        # storing the dayly statistics and remving the original file
         with open(filePath_absolute(month,year),'wb') as f:
             pickle.dump({'time':np.array(t_list),'longitude':lonval,'latitude':latval,'data':var_data},f, pickle.HIGHEST_PROTOCOL)
         os.remove(fileName)
